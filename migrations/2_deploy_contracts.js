@@ -1,4 +1,4 @@
-const Remittance = artifacts.require("Remittance.sol");
+const Remittance = artifacts.require("Remittance");
 
 module.exports = function(deployer, network, accounts) {
     const MAX_GAS = 4700000;
