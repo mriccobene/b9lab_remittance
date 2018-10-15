@@ -1,0 +1,28 @@
+{
+  "name": "b9lab_remittance",
+  "version": "1.0.0",
+  "description": "b9lab eth module 7 - project 2",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mriccobene/b9lab_remittance.git"
+  },
+  "keywords": [
+    "ethereum"
+  ],
+  "author": "michelangelo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mriccobene/b9lab_remittance/issues"
+  },
+  "homepage": "https://github.com/mriccobene/b9lab_remittance#readme",
+  "dependencies": {
+    "bluebird": "^3.5.2"
+  }
+}
