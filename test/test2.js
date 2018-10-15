@@ -14,11 +14,11 @@ if (typeof web3.version.getNodePromise !== "function") {
 
 const txCost = require("../utils/txCost");
 
-const Remittance = artifacts.require("Remittance");
-
+const Remittance2 = artifacts.require("Remittance2");
+const DossierLib = artifacts.require("DossierLib");
 
 // Test
-contract("Remittance", function(accounts) {
+contract("Remittance2", function(accounts) {
     const MAX_GAS = 4700000;
 
     let owner, alice, bob, carol;
@@ -27,10 +27,11 @@ contract("Remittance", function(accounts) {
         [owner, alice, bob, carol] = accounts;
     });
 
-    let instance;
+    let instance, lib;
     beforeEach("create a new Remittance instance", async function() {
         //let instance = await Remittance.deployed();     // prefer to create a fresh instance before each test
-        instance = await Remittance.new({ from: owner, gas: MAX_GAS });
+        instance = await Remittance2.new({ from: owner, gas: MAX_GAS });
+        lib = await DossierLib.new({ from: owner, gas: MAX_GAS });
     });
 
     describe("#usual user case", async function() {
@@ -40,14 +41,16 @@ contract("Remittance", function(accounts) {
             let remitterSecret = "Hello Carol!";
             let amount = web3.toBigNumber(web3.toWei(0.1, "ether"));
 
-            let receiverSecretHash = await instance.secretHash(receiverSecret);
-            let remitterSecretHash = await instance.secretHash(remitterSecret);
+            let receiverSecretHash = await lib.secretHash(receiverSecret);
+            let remitterSecretHash = await lib.secretHash(remitterSecret);
 
             await instance.open(bob, receiverSecretHash, carol, remitterSecretHash, { value: amount, from: alice, gas: MAX_GAS });
 
+            let dossierId = await lib.dossierId(alice, bob, receiverSecretHash, carol, remitterSecretHash);
+
             let carolInitialBalance = await web3.eth.getBalancePromise(carol);
 
-            let tx = await instance.close(alice, bob, receiverSecret, remitterSecret, { from: carol, gas: MAX_GAS });
+            let tx = await instance.close(dossierId, receiverSecret, remitterSecret, { from: carol, gas: MAX_GAS });
 
             const closeCost = await txCost(tx.receipt);
 

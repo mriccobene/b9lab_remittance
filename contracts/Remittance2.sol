@@ -32,9 +32,9 @@ contract Remittance2 {
 
         require(amount != 0, "no exchange");
 
-        delete dossiers[dossierId];
-
         dossier.close(receiverSecret, remitterSecret);
+
+        delete dossiers[dossierId];
     }
 
 

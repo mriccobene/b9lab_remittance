@@ -14,7 +14,7 @@ module.exports = function(deployer, network, accounts) {
 
         let lib = await deployer.deploy(DossierLib, { from: owner, gas: MAX_GAS });
         let libReceipt = web3.eth.getTransactionReceipt(lib.transactionHash);
-        console.log('  DossierLib deployment gasUsed: ' + libReceipt.gasUsed);
+        console.log('  DossierLib  deployment gasUsed: ' + libReceipt.gasUsed);
 
         let link = await deployer.link(DossierLib, Remittance2);
 
