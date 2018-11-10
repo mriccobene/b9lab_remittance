@@ -13,7 +13,7 @@ contract Remittance {
         bytes32 remitterSecretHash;
     }
 
-    mapping(bytes32 => Dossier) dossiers;
+    mapping(bytes32 => Dossier) public dossiers;
 
     function secretHash(string secret) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(secret));
