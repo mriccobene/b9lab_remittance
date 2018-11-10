@@ -2,10 +2,15 @@
 
 /**
  * Returns tx cost from tx receipt
+ *
+ * Author: Mike
+ *
+ * Import:
+ *     web3.eth.txCost = require("../utils/txCost.js");
  */
 
 module.exports = async function txCost(txReceipt) {
-    let txDetails = await web3.eth.getTransaction(txReceipt.transactionHash);
+    let txDetails = await this.getTransaction(txReceipt.transactionHash);
     //console.log(txDetails);
 
     let txCost = txDetails.gasPrice.mul(txReceipt.gasUsed);

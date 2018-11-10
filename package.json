@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/mriccobene/b9lab_remittance#readme",
   "dependencies": {
-    "bluebird": "^3.5.2"
+    "bluebird": "^3.5.2",
+    "bluebird-retry": "^0.11.0"
   }
 }

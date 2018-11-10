@@ -12,19 +12,22 @@ if (typeof web3.version.getNodePromise !== "function") {
     promise.promisifyAll(web3.version, { suffix: "Promise" });
 }
 
-const txCost = require("../utils/txCost");
+web3.eth.txCost                     = require("../utils/txCost");
+web3.eth.expectedExceptionPromise   = require("../utils/expectedExceptionPromise.js");
+web3.eth.getPastTimestamp           = require("../utils/getPastTimestamp.js");
+web3.eth.getTransactionReceiptMined = require("../utils/getTransactionReceiptMined.js");
 
 const Remittance = artifacts.require("Remittance");
-
 
 // Test
 contract("Remittance", function(accounts) {
     const MAX_GAS = 4700000;
+    const _1day = 60 * 60 * 24;
 
-    let owner, alice, bob, carol;
+    let owner, alice, carol;
     before("check accounts", async function() {
         assert.isAtLeast(accounts.length, 4, "not enough accounts");
-        [owner, alice, bob, carol] = accounts;
+        [owner, alice, carol] = accounts;
     });
 
     let instance;
@@ -33,23 +36,28 @@ contract("Remittance", function(accounts) {
         instance = await Remittance.new({ from: owner, gas: MAX_GAS });
     });
 
-    describe("#usual user case", async function() {
+    describe("#usual use case", async function() {
 
         it("should open and close dossier correctly", async function() {
             let receiverSecret = "Hello Bob!";
             let remitterSecret = "Hello Carol!";
             let amount = web3.toBigNumber(web3.toWei(0.1, "ether"));
 
-            let receiverSecretHash = await instance.secretHash(receiverSecret);
-            let remitterSecretHash = await instance.secretHash(remitterSecret);
+            let receiverSecretHash = await instance.computeSecretHash(receiverSecret);
+            let remitterSecretHash = await instance.computeSecretHash(remitterSecret);
 
-            await instance.open(bob, receiverSecretHash, carol, remitterSecretHash, { value: amount, from: alice, gas: MAX_GAS });
+            let currentBlockNumber = await web3.eth.getBlockNumberPromise();
+            let currentBlock = await web3.eth.getBlock(currentBlockNumber);
+            let now = currentBlock.timestamp;
+            let deadline = now + _1day * 10;
+
+            await instance.open(carol, receiverSecretHash, remitterSecretHash, deadline, { value: amount, from: alice, gas: MAX_GAS });
 
             let carolInitialBalance = await web3.eth.getBalancePromise(carol);
 
-            let tx = await instance.close(alice, bob, receiverSecret, remitterSecret, { from: carol, gas: MAX_GAS });
+            let tx = await instance.close(alice, receiverSecret, remitterSecret, { from: carol, gas: MAX_GAS });
 
-            const closeCost = await txCost(tx.receipt);
+            const closeCost = await web3.eth.txCost(tx.receipt);
 
             const carolFinalBalance_estimated = carolInitialBalance.add(amount).sub(closeCost);
 
@@ -84,4 +92,52 @@ contract("Remittance", function(accounts) {
         // todo: write more tests
     });
 
+
+    describe("#dossier aborting", async function() {
+
+        let receiverSecret, remitterSecret, receiverSecretHash, remitterSecretHash, amount, deadline;
+        let aliceBalanceAfterOpening;
+
+        beforeEach("open dossier", async function() {
+            receiverSecret = "Hello Bob!";
+            remitterSecret = "Hello Carol!";
+            amount = web3.toBigNumber(web3.toWei(0.1, "ether"));
+
+            receiverSecretHash = await instance.computeSecretHash(receiverSecret);
+            remitterSecretHash = await instance.computeSecretHash(remitterSecret);
+
+            let currentBlockNumber = await web3.eth.getBlockNumberPromise();
+            let currentBlock = await web3.eth.getBlock(currentBlockNumber);
+            let now = currentBlock.timestamp;
+            deadline = now + _1day * 3;
+
+            await instance.open(carol, receiverSecretHash, remitterSecretHash, deadline, { value: amount, from: alice, gas: MAX_GAS });
+
+            aliceBalanceAfterOpening = await web3.eth.getBalancePromise(alice);
+        });
+
+        it("should abort and return funds correctly", async function() {
+            await web3.eth.getPastTimestamp(deadline);
+
+            let tx = await instance.abort(carol, receiverSecretHash, remitterSecretHash, { from: alice, gas: MAX_GAS });
+
+            const abortCost = await web3.eth.txCost(tx.receipt);
+
+            const aliceFinalBalance_estimated = aliceBalanceAfterOpening.add(amount).sub(abortCost);
+
+            let aliceFinalBalance = await web3.eth.getBalancePromise(alice);
+
+            assert(aliceFinalBalance.toString() == aliceFinalBalance_estimated.toString(),
+                `alice end balance doesn't match, expected ${aliceFinalBalance_estimated.toString()}, actual ${aliceFinalBalance.toString()}`);
+        });
+
+        it("should reject aborting before deadline", async function() {
+            // here we do not wait deadline
+
+            await web3.eth.expectedExceptionPromise( () => {
+                return instance.abort(carol, receiverSecretHash, remitterSecretHash, { from: alice, gas: MAX_GAS });
+            }, MAX_GAS);
+
+        });
+    });
 });

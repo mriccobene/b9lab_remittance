@@ -1,73 +1,91 @@
 pragma solidity ^0.4.24;
 
 contract Remittance {
-    event Deposit(address indexed sender , address indexed receiver, address indexed remitter, uint amount);
-    event Withdraw(address indexed sender , address indexed receiver, address indexed remitter, uint amount);
+    event Deposit(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
+    event Withdraw(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
+    event Abort(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
 
     struct Dossier {
         address sender;
-        address receiver;
         address remitter;
         uint256 amount;
-        bytes32 receiverSecretHash;
-        bytes32 remitterSecretHash;
+        uint256 deadline;   // seconds since the epoch
     }
 
     mapping(bytes32 => Dossier) public dossiers;
 
-    function secretHash(string secret) public pure returns (bytes32) {
+    function computeSecretHash(string secret) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(secret));
     }
 
-    function dossierId(address sender, address receiver, bytes32 receiverSecretHash, address remitter, bytes32 remitterSecretHash) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(sender, receiver, receiverSecretHash, remitter, remitterSecretHash));
+    function computeDossierId(address sender, bytes32 receiverSecretHash, address remitter, bytes32 remitterSecretHash) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(sender, receiverSecretHash, remitter, remitterSecretHash));
     }
 
-    function open(address receiver, bytes32 receiverSecretHash, address remitter, bytes32 remitterSecretHash) public payable {
-        address sender = msg.sender;
-        uint256 amount = msg.value;
+    function isDeadlineAcceptable(uint256 deadline) public view returns (bool) {
+        return deadline > block.timestamp &&
+               deadline - block.timestamp >=  3 days &&
+               deadline - block.timestamp <= 30 days;
+    }
 
-        require(receiver != address(0));
-        require(remitter != address(0));
-        require(amount != 0);
+    // opening a remittance dossier and collecting funds
+    function open(address remitter, bytes32 receiverSecretHash, bytes32 remitterSecretHash, uint256 deadline) public payable {
+        // here: address sender = msg.sender;
 
-        bytes32 hash = dossierId(sender, receiver, receiverSecretHash, remitter, remitterSecretHash);
-        Dossier storage dossier = dossiers[hash];
+        require(remitter != address(0), "invalid remitter");
+        require(msg.value != 0, "zero amount");
+        require(isDeadlineAcceptable(deadline), "deadline is not acceptable");
+
+        bytes32 dossierId = computeDossierId(msg.sender, receiverSecretHash, remitter, remitterSecretHash);
+        Dossier storage dossier = dossiers[dossierId];
 
         require(dossier.amount == 0, "duplicate exchange");
 
-        dossier.sender = sender;
-        dossier.receiver = receiver;
+        dossier.sender = msg.sender;
         dossier.remitter = remitter;
-        dossier.amount = amount;
-        dossier.receiverSecretHash = receiverSecretHash;
-        dossier.remitterSecretHash = remitterSecretHash;
+        dossier.amount = msg.value;
 
-        emit Deposit(sender, receiver, remitter, amount);
+        emit Deposit(dossier.sender, dossier.remitter, dossierId, dossier.amount);
     }
 
-    function close(address sender, address receiver, string receiverSecret, string remitterSecret) public {
+    // closing a remittance dossier and sending funds to remitter
+    function close(address sender, string receiverSecret, string remitterSecret) public {
         address remitter = msg.sender;
 
-        bytes32 receiverSecretHash = secretHash(receiverSecret);
-        bytes32 remitterSecretHash = secretHash(remitterSecret);
+        bytes32 receiverSecretHash = computeSecretHash(receiverSecret);
+        bytes32 remitterSecretHash = computeSecretHash(remitterSecret);
 
-        bytes32 hash = dossierId(sender, receiver, receiverSecretHash, remitter, remitterSecretHash);
-        Dossier storage dossier = dossiers[hash];
+        bytes32 dossierId = computeDossierId(sender, receiverSecretHash, remitter, remitterSecretHash);
+        Dossier storage dossier = dossiers[dossierId];
 
         uint256 amount = dossier.amount;
 
         require(amount != 0, "no exchange");
 
-        delete dossiers[hash];
+        delete dossiers[dossierId];
 
-        emit Withdraw(sender , receiver, remitter, amount);
+        emit Withdraw(sender, remitter, dossierId, amount);
 
         remitter.transfer(amount);
     }
 
-    //function abort(address receiver, bytes32 receiverSecretHash, address remitter, bytes32 remitterSecretHash) public {
-    //    // todo: if not closed, at a deadline sender can revoke funds
-    //}
+    // revoking funds (sender can revoke funds if deadline is reached)
+    function abort(address remitter, bytes32 receiverSecretHash, bytes32 remitterSecretHash) public {
+        // here: address sender = msg.sender;
+
+        bytes32 dossierId = computeDossierId(msg.sender, receiverSecretHash, remitter, remitterSecretHash);
+        Dossier storage dossier = dossiers[dossierId];
+
+        uint256 amount = dossier.amount;
+
+        require(amount != 0, "no exchange");
+        require(dossier.deadline <= block.timestamp, "deadline not reached");
+
+        delete dossiers[dossierId];
+
+        emit Abort(msg.sender, remitter, dossierId, amount);
+
+        msg.sender.transfer(amount);
+    }
 }
 
