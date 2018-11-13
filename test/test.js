@@ -63,8 +63,7 @@ contract("Remittance", function(accounts) {
 
             let carolFinalBalance = await web3.eth.getBalancePromise(carol);
 
-            assert(carolFinalBalance.toString() == carolFinalBalance_estimated.toString(),
-                `carol end balance doesn't match, expected ${carolFinalBalance_estimated.toString()}, actual ${carolFinalBalance.toString()}`);
+            assert.equal(carolFinalBalance.toString(10), carolFinalBalance_estimated.toString(10), "carol end balance doesn't match");
 
         });
 
@@ -127,12 +126,15 @@ contract("Remittance", function(accounts) {
 
             let aliceFinalBalance = await web3.eth.getBalancePromise(alice);
 
-            assert(aliceFinalBalance.toString() == aliceFinalBalance_estimated.toString(),
-                `alice end balance doesn't match, expected ${aliceFinalBalance_estimated.toString()}, actual ${aliceFinalBalance.toString()}`);
+            assert.equal(aliceFinalBalance.toString(10), aliceFinalBalance_estimated.toString(10), "alice end balance doesn't match");
         });
 
         it("should reject aborting before deadline", async function() {
             // here we do not wait deadline
+
+            let currentBlockNumber = await web3.eth.getBlockNumberPromise();
+            let currentBlock = await web3.eth.getBlock(currentBlockNumber);
+            let now = currentBlock.timestamp;
 
             await web3.eth.expectedExceptionPromise( () => {
                 return instance.abort(carol, receiverSecretHash, remitterSecretHash, { from: alice, gas: MAX_GAS });

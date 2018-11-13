@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
 contract Remittance {
+    event Creation(address indexed sender);
     event Deposit(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
     event Withdraw(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
     event Abort(address indexed sender, address indexed remitter, bytes32 indexed dossierId, uint amount);
@@ -13,6 +14,10 @@ contract Remittance {
     }
 
     mapping(bytes32 => Dossier) public dossiers;
+
+    constructor() {
+        emit Creation(msg.sender);
+    }
 
     function computeSecretHash(string secret) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(secret));
@@ -44,6 +49,7 @@ contract Remittance {
         dossier.sender = msg.sender;
         dossier.remitter = remitter;
         dossier.amount = msg.value;
+        dossier.deadline = deadline;
 
         emit Deposit(dossier.sender, dossier.remitter, dossierId, dossier.amount);
     }
