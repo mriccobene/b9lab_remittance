@@ -26,7 +26,7 @@ contract("Remittance", function(accounts) {
 
     let owner, alice, carol;
     before("check accounts", async function() {
-        assert.isAtLeast(accounts.length, 4, "not enough accounts");
+        assert.isAtLeast(accounts.length, 3, "not enough accounts");
         [owner, alice, carol] = accounts;
     });
 
