@@ -43,15 +43,13 @@ contract("Remittance", function(accounts) {
             let remitterSecret = "Hello Carol!";
             let amount = web3.toBigNumber(web3.toWei(0.1, "ether"));
 
-            let receiverSecretHash = await instance.computeSecretHash(receiverSecret);
-            let remitterSecretHash = await instance.computeSecretHash(remitterSecret);
-
             let currentBlockNumber = await web3.eth.getBlockNumberPromise();
             let currentBlock = await web3.eth.getBlock(currentBlockNumber);
             let now = currentBlock.timestamp;
             let deadline = now + _1day * 10;
 
-            await instance.open(carol, receiverSecretHash, remitterSecretHash, deadline, { value: amount, from: alice, gas: MAX_GAS });
+            let dossierId = await instance.computeDossierId(alice, receiverSecret, carol, remitterSecret);
+            await instance.open(dossierId, deadline, { value: amount, from: alice, gas: MAX_GAS });
 
             let carolInitialBalance = await web3.eth.getBalancePromise(carol);
 
@@ -94,7 +92,7 @@ contract("Remittance", function(accounts) {
 
     describe("#dossier aborting", async function() {
 
-        let receiverSecret, remitterSecret, receiverSecretHash, remitterSecretHash, amount, deadline;
+        let dossierId, receiverSecret, remitterSecret, amount, deadline;
         let aliceBalanceAfterOpening;
 
         beforeEach("open dossier", async function() {
@@ -102,15 +100,13 @@ contract("Remittance", function(accounts) {
             remitterSecret = "Hello Carol!";
             amount = web3.toBigNumber(web3.toWei(0.1, "ether"));
 
-            receiverSecretHash = await instance.computeSecretHash(receiverSecret);
-            remitterSecretHash = await instance.computeSecretHash(remitterSecret);
-
             let currentBlockNumber = await web3.eth.getBlockNumberPromise();
             let currentBlock = await web3.eth.getBlock(currentBlockNumber);
             let now = currentBlock.timestamp;
             deadline = now + _1day * 3;
 
-            await instance.open(carol, receiverSecretHash, remitterSecretHash, deadline, { value: amount, from: alice, gas: MAX_GAS });
+            dossierId = await instance.computeDossierId(alice, receiverSecret, carol, remitterSecret);
+            await instance.open(dossierId, deadline, { value: amount, from: alice, gas: MAX_GAS });
 
             aliceBalanceAfterOpening = await web3.eth.getBalancePromise(alice);
         });
@@ -118,7 +114,7 @@ contract("Remittance", function(accounts) {
         it("should abort and return funds correctly", async function() {
             await web3.eth.getPastTimestamp(deadline);
 
-            let tx = await instance.abort(carol, receiverSecretHash, remitterSecretHash, { from: alice, gas: MAX_GAS });
+            let tx = await instance.abort(carol, receiverSecret, remitterSecret, { from: alice, gas: MAX_GAS });
 
             const abortCost = await web3.eth.txCost(tx.receipt);
 
@@ -137,7 +133,7 @@ contract("Remittance", function(accounts) {
             let now = currentBlock.timestamp;
 
             await web3.eth.expectedExceptionPromise( () => {
-                return instance.abort(carol, receiverSecretHash, remitterSecretHash, { from: alice, gas: MAX_GAS });
+                return instance.abort(carol, receiverSecret, remitterSecret, { from: alice, gas: MAX_GAS });
             }, MAX_GAS);
 
         });
